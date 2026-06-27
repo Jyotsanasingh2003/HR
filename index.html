@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>RecruitOS</title>
+<script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<style>
+  :root{
+    --purple:#8b5cf6; --blue:#3b82f6; --green:#10b981;
+    --bg:#0b0f1a; --card:rgba(255,255,255,0.05); --border:rgba(255,255,255,0.1);
+    --text:#fff; --muted:#94a3b8;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+    background:var(--bg); color:var(--text); min-height:100vh;
+    background-image:
+      radial-gradient(circle at 20% 20%, rgba(139,92,246,0.18), transparent 40%),
+      radial-gradient(circle at 80% 0%, rgba(59,130,246,0.18), transparent 40%),
+      radial-gradient(circle at 50% 100%, rgba(16,185,129,0.18), transparent 40%);
+  }
+  .hidden{display:none !important;}
+  /* ---------- AUTH SCREEN ---------- */
+  #auth-screen{min-height:100vh; display:flex; align-items:center; justify-content:center; padding:20px;}
+  .auth-box{
+    width:100%; max-width:400px; background:var(--card); border:1px solid var(--border);
+    border-radius:20px; padding:32px; backdrop-filter:blur(20px);
+  }
+  .logo{display:flex; align-items:center; gap:10px; margin-bottom:24px; justify-content:center;}
+  .logo-icon{
+    width:38px; height:38px; border-radius:10px;
+    background:linear-gradient(135deg,var(--purple),var(--blue),var(--green));
+    display:flex; align-items:center; justify-content:center; font-weight:bold; font-size:18px;
+  }
+  .logo-text{font-size:22px; font-weight:800;}
+  .gradient-text{background:linear-gradient(90deg,var(--purple),var(--blue),var(--green)); -webkit-background-clip:text; background-clip:text; color:transparent;}
+  h2.title{text-align:center; font-size:16px; color:var(--muted); margin-bottom:24px; font-weight:500;}
+  label{font-size:13px; color:var(--muted); display:block; margin-bottom:6px; margin-top:14px;}
+  input{
+    width:100%; padding:11px 14px; border-radius:10px; border:1px solid var(--border);
+    background:rgba(255,255,255,0.04); color:var(--text); font-size:14px; outline:none;
+  }
+  input:focus{border-color:var(--purple);}
+  button{
+    cursor:pointer; border:none; font-weight:600; font-size:14px; border-radius:10px;
+    padding:12px; transition:all 0.2s; width:100%;
+  }
+  .btn-primary{
+    background:linear-gradient(90deg,var(--purple),var(--blue),var(--green)); color:#fff;
+    margin-top:20px;
+  }
+  .btn-primary:hover{box-shadow:0 8px 24px rgba(139,92,246,0.35); transform:translateY(-1px);}
+  .btn-primary:disabled{opacity:0.6; cursor:not-allowed;}
+  .switch-mode{text-align:center; margin-top:16px; font-size:13px; color:var(--muted);}
+  .switch-mode a{color:var(--purple); cursor:pointer; font-weight:600; text-decoration:none;}
+  #auth-error{color:#f87171; font-size:13px; margin-top:10px; text-align:center;}
+  #auth-msg{color:#34d399; font-size:13px; margin-top:10px; text-align:center;}
+
+  /* ---------- APP SHELL ---------- */
+  #app{display:none; min-height:100vh;}
+  #app.show{display:flex;}
+  .sidebar{
+    width:230px; background:rgba(5,8,15,0.7); border-right:1px solid var(--border);
+    padding:20px 14px; display:flex; flex-direction:column; gap:6px; backdrop-filter:blur(20px);
+  }
+  .sidebar .logo{justify-content:flex-start; margin-bottom:20px; padding:0 6px;}
+  .nav-btn{
+    display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:10px;
+    background:transparent; color:var(--muted); text-align:left; font-size:14px; font-weight:500;
+  }
+  .nav-btn.active{background:rgba(139,92,246,0.18); color:#fff;}
+  .nav-btn:hover{background:rgba(255,255,255,0.06); color:#fff;}
+  .main{flex:1; padding:28px; overflow-y:auto; max-height:100vh;}
+  .topbar{display:flex; justify-content:space-between; align-items:center; margin-bottom:24px;}
+  .topbar .who{font-size:13px; color:var(--muted);}
+  .btn-ghost{
+    background:rgba(255,255,255,0.06); color:#fff; border:1px solid var(--border);
+    padding:9px 16px; width:auto; font-size:13px;
+  }
+  .btn-small{
+    background:linear-gradient(90deg,var(--purple),var(--blue)); color:#fff;
+    padding:9px 16px; width:auto; font-size:13px;
+  }
+
+  h1.page-title{font-size:22px; font-weight:800; margin-bottom:4px;}
+  p.page-sub{color:var(--muted); font-size:14px; margin-bottom:20px;}
+
+  .grid-stats{display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:14px; margin-bottom:24px;}
+  .card{
+    background:var(--card); border:1px solid var(--border); border-radius:16px; padding:18px;
+    backdrop-filter:blur(16px);
+  }
+  .stat-label{font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:0.05em;}
+  .stat-value{font-size:28px; font-weight:800; margin-top:6px;}
+
+  .roles-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:14px;}
+  .role-card h3{font-size:15px; margin-bottom:6px;}
+  .role-meta{font-size:12px; color:var(--muted); margin-bottom:8px;}
+  .pill{
+    display:inline-flex; align-items:center; gap:4px; font-size:11px; font-weight:600;
+    padding:3px 10px; border-radius:999px; background:rgba(255,255,255,0.08); color:#cbd5e1;
+  }
+  .pill-high{background:rgba(244,63,94,0.15); color:#fb7185;}
+  .pill-medium{background:rgba(245,158,11,0.15); color:#fbbf24;}
+  .pill-low{background:rgba(16,185,129,0.15); color:#34d399;}
+
+  .kanban-wrap{display:flex; gap:14px; overflow-x:auto; padding-bottom:10px;}
+  .kanban-col{min-width:230px; width:230px; flex-shrink:0;}
+  .kanban-col h4{font-size:13px; color:#cbd5e1; margin-bottom:10px; display:flex; justify-content:space-between;}
+  .kanban-body{background:rgba(255,255,255,0.02); border-radius:14px; padding:8px; min-height:100px; display:flex; flex-direction:column; gap:8px;}
+  .cand-card{
+    background:rgba(255,255,255,0.05); border:1px solid var(--border); border-radius:12px;
+    padding:10px; cursor:grab; font-size:13px;
+  }
+  .cand-card:hover{border-color:rgba(139,92,246,0.4);}
+  .cand-card .name{font-weight:600; margin-bottom:2px;}
+  .cand-card .sub{font-size:11px; color:var(--muted);}
+
+  .modal-bg{
+    position:fixed; inset:0; background:rgba(0,0,0,0.6); display:flex; align-items:center;
+    justify-content:center; z-index:50; padding:20px;
+  }
+  .modal{
+    background:#10141f; border:1px solid var(--border); border-radius:18px; padding:26px;
+    width:100%; max-width:440px; max-height:85vh; overflow-y:auto;
+  }
+  .modal h3{margin-bottom:16px; font-size:17px;}
+  .modal-actions{display:flex; gap:10px; margin-top:18px;}
+  select{
+    width:100%; padding:11px 14px; border-radius:10px; border:1px solid var(--border);
+    background:rgba(255,255,255,0.04); color:var(--text); font-size:14px;
+  }
+  .empty-state{text-align:center; padding:40px; color:var(--muted); font-size:14px;}
+  #toast{
+    position:fixed; bottom:20px; right:20px; background:#1e293b; border:1px solid var(--border);
+    padding:12px 18px; border-radius:12px; font-size:13px; z-index:100; display:none;
+  }
+</style>
+</head>
+<body>
+
+<!-- ================= AUTH SCREEN ================= -->
+<div id="auth-screen">
+  <div class="auth-box">
+    <div class="logo"><div class="logo-icon">⚡</div><div class="logo-text">Recruit<span class="gradient-text">OS</span></div></div>
+    <h2 class="title" id="auth-title">Sign in to your workspace</h2>
+
+    <div id="signup-fields" class="hidden">
+      <label>Full Name</label>
+      <input id="su-name" placeholder="Jane Doe" />
+      <label>Workspace / Company Name</label>
+      <input id="su-org" placeholder="Acme Talent Team" />
+    </div>
+    <label>Email</label>
+    <input id="auth-email" type="email" placeholder="you@company.com" />
+    <label>Password</label>
+    <input id="auth-password" type="password" placeholder="••••••••" />
+
+    <button class="btn-primary" id="auth-submit">Sign In</button>
+    <div id="auth-error"></div>
+    <div id="auth-msg"></div>
+    <div class="switch-mode" id="switch-line">Don't have an account? <a id="switch-link">Sign up</a></div>
+  </div>
+</div>
+
+<!-- ================= APP ================= -->
+<div id="app">
+  <div class="sidebar">
+    <div class="logo"><div class="logo-icon">⚡</div><div class="logo-text">Recruit<span class="gradient-text">OS</span></div></div>
+    <button class="nav-btn active" data-view="dashboard">📊 Dashboard</button>
+    <button class="nav-btn" data-view="roles">💼 Open Roles</button>
+    <button class="nav-btn" data-view="kanban">🗂️ Candidates</button>
+    <div style="flex:1"></div>
+    <button class="nav-btn" id="logout-btn">🚪 Log out</button>
+  </div>
+  <div class="main">
+    <div class="topbar">
+      <div class="who">Signed in as <strong id="who-name"></strong></div>
+      <div></div>
+    </div>
+    <div id="view-root"></div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+/* ============== CONFIG ============== */
+const SUPABASE_URL = "https://tgbqnsqbfgxpqkvykxtl.supabase.co";
+const SUPABASE_KEY = "sb_publishable_2P3fUn2lOSAW5l50v8pryg_97jq3gj0";
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const STAGES = ["Screening","Round 1","Round 2","Round 3","Hiring Manager","Founder Round","HR Round"];
+
+let state = { user:null, profile:null, orgId:null, roles:[], candidates:[], view:"dashboard" };
+
+function toast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.style.display = 'block';
+  setTimeout(()=>{ t.style.display='none'; }, 2500);
+}
+
+/* ============== AUTH ============== */
+let isSignup = false;
+document.getElementById('switch-link').onclick = () => {
+  isSignup = !isSignup;
+  document.getElementById('signup-fields').classList.toggle('hidden', !isSignup);
+  document.getElementById('auth-title').textContent = isSignup ? "Create your workspace" : "Sign in to your workspace";
+  document.getElementById('auth-submit').textContent = isSignup ? "Sign Up" : "Sign In";
+  document.getElementById('switch-line').innerHTML = isSignup
+    ? 'Already have an account? <a id="switch-link2">Sign in</a>'
+    : 'Don\'t have an account? <a id="switch-link2">Sign up</a>';
+  document.getElementById('switch-link2').onclick = document.getElementById('switch-link').onclick;
+  document.getElementById('auth-error').textContent = '';
+  document.getElementById('auth-msg').textContent = '';
+};
+
+document.getElementById('auth-submit').onclick = async () => {
+  const email = document.getElementById('auth-email').value.trim();
+  const password = document.getElementById('auth-password').value;
+  const errEl = document.getElementById('auth-error');
+  const msgEl = document.getElementById('auth-msg');
+  errEl.textContent=''; msgEl.textContent='';
+  if(!email || !password){ errEl.textContent = "Please fill in email and password."; return; }
+
+  const btn = document.getElementById('auth-submit');
+  btn.disabled = true; btn.textContent = "Please wait...";
+
+  try{
+    if(isSignup){
+      const name = document.getElementById('su-name').value.trim();
+      const org = document.getElementById('su-org').value.trim();
+      const { data, error } = await sb.auth.signUp({
+        email, password,
+        options:{ data:{ full_name:name, org_name:org } }
+      });
+      if(error) throw error;
+      if(data.session){ await loadApp(); }
+      else { msgEl.textContent = "Account created! Check your email to confirm, then sign in."; }
+    } else {
+      const { data, error } = await sb.auth.signInWithPassword({ email, password });
+      if(error) throw error;
+      await loadApp();
+    }
+  } catch(e){
+    errEl.textContent = e.message || "Something went wrong.";
+  } finally {
+    btn.disabled = false; btn.textContent = isSignup ? "Sign Up" : "Sign In";
+  }
+};
+
+document.getElementById('logout-btn').onclick = async () => {
+  await sb.auth.signOut();
+  location.reload();
+};
+
+/* ============== LOAD APP DATA ============== */
+async function loadApp(){
+  const { data:{ user } } = await sb.auth.getUser();
+  if(!user){ return; }
+  state.user = user;
+
+  const { data: profile } = await sb.from('profiles').select('*').eq('id', user.id).single();
+  state.profile = profile;
+  state.orgId = profile?.org_id;
+
+  document.getElementById('who-name').textContent = profile?.full_name || user.email;
+
+  await refreshData();
+
+  document.getElementById('auth-screen').style.display = 'none';
+  document.getElementById('app').classList.add('show');
+  render();
+}
+
+async function refreshData(){
+  const { data: roles } = await sb.from('roles').select('*').eq('org_id', state.orgId).order('created_at',{ascending:false});
+  const { data: candidates } = await sb.from('candidates').select('*').eq('org_id', state.orgId).order('created_at',{ascending:false});
+  state.roles = roles || [];
+  state.candidates = candidates || [];
+}
+
+/* check existing session on page load */
+sb.auth.getSession().then(({ data }) => { if(data.session) loadApp(); });
+
+/* ============== NAVIGATION ============== */
+document.querySelectorAll('.nav-btn[data-view]').forEach(btn => {
+  btn.onclick = () => {
+    document.querySelectorAll('.nav-btn[data-view]').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    state.view = btn.dataset.view;
+    render();
+  };
+});
+
+/* ============== RENDER ============== */
+function render(){
+  const root = document.getElementById('view-root');
+  if(state.view === 'dashboard') root.innerHTML = renderDashboard();
+  else if(state.view === 'roles') root.innerHTML = renderRoles();
+  else if(state.view === 'kanban') root.innerHTML = renderKanban();
+  attachHandlers();
+}
+
+function renderDashboard(){
+  const totalOpen = state.roles.reduce((s,r)=>s+(r.open_positions||0),0);
+  const totalCandidates = state.candidates.length;
+  const activeInterviews = state.candidates.filter(c=>STAGES.includes(c.stage)).length;
+  return `
+    <h1 class="page-title">Welcome back 👋</h1>
+    <p class="page-sub">Here's a snapshot of your hiring pipeline.</p>
+    <div class="grid-stats">
+      ${statCard("Open Positions", totalOpen)}
+      ${statCard("Total Candidates", totalCandidates)}
+      ${statCard("Active Interviews", activeInterviews)}
+      ${statCard("Roles Created", state.roles.length)}
+    </div>
+    <div class="card">
+      <h3 style="margin-bottom:14px;">Recent Roles</h3>
+      ${state.roles.slice(0,5).map(r=>`<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);font-size:14px;">
+        <span>${esc(r.title)}</span><span class="pill">${esc(r.status)}</span></div>`).join('') || '<div class="empty-state">No roles yet — add one from Open Roles.</div>'}
+    </div>
+  `;
+}
+
+function statCard(label, value){
+  return `<div class="card"><div class="stat-label">${label}</div><div class="stat-value">${value}</div></div>`;
+}
+
+function renderRoles(){
+  return `
+    <div class="topbar" style="margin-bottom:18px;">
+      <div>
+        <h1 class="page-title">Open Roles</h1>
+        <p class="page-sub" style="margin-bottom:0;">${state.roles.length} roles in your workspace</p>
+      </div>
+      <button class="btn-small" id="add-role-btn">+ New Role</button>
+    </div>
+    <div class="roles-grid">
+      ${state.roles.map(r=>`
+        <div class="card role-card">
+          <span class="pill pill-${(r.priority||'medium').toLowerCase()}">${esc(r.priority)}</span>
+          <h3 style="margin-top:8px;">${esc(r.title)}</h3>
+          <div class="role-meta">${esc(r.department||'')} · ${esc(r.location||'')}</div>
+          <div class="role-meta">HM: ${esc(r.hiring_manager||'—')} · ${r.open_positions||0} positions</div>
+          <span class="pill">${esc(r.status)}</span>
+        </div>
+      `).join('') || '<div class="empty-state">No roles yet. Click "+ New Role" to add your first one.</div>'}
+    </div>
+  `;
+}
+
+function renderKanban(){
+  return `
+    <h1 class="page-title">Candidate Pipeline</h1>
+    <p class="page-sub">Drag cards between stages, or click "+ Add Candidate".</p>
+    <button class="btn-small" id="add-cand-btn" style="margin-bottom:16px;">+ Add Candidate</button>
+    <div class="kanban-wrap">
+      ${STAGES.map(stage => `
+        <div class="kanban-col" data-stage="${stage}">
+          <h4>${stage} <span>${state.candidates.filter(c=>c.stage===stage).length}</span></h4>
+          <div class="kanban-body" data-stage-drop="${stage}">
+            ${state.candidates.filter(c=>c.stage===stage).map(c=>`
+              <div class="cand-card" draggable="true" data-id="${c.id}">
+                <div class="name">${esc(c.name)}</div>
+                <div class="sub">${esc(c.designation||'')} · ${c.experience_years||0}y</div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+function esc(s){ return (s===null||s===undefined) ? '' : String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+/* ============== HANDLERS (forms, drag-drop) ============== */
+function attachHandlers(){
+  const addRoleBtn = document.getElementById('add-role-btn');
+  if(addRoleBtn) addRoleBtn.onclick = openRoleModal;
+
+  const addCandBtn = document.getElementById('add-cand-btn');
+  if(addCandBtn) addCandBtn.onclick = openCandidateModal;
+
+  document.querySelectorAll('.cand-card').forEach(card => {
+    card.addEventListener('dragstart', e => e.dataTransfer.setData('id', card.dataset.id));
+  });
+  document.querySelectorAll('[data-stage-drop]').forEach(col => {
+    col.addEventListener('dragover', e => e.preventDefault());
+    col.addEventListener('drop', async e => {
+      const id = e.dataTransfer.getData('id');
+      const newStage = col.dataset.stageDrop;
+      await sb.from('candidates').update({ stage:newStage }).eq('id', id);
+      await refreshData(); render();
+    });
+  });
+}
+
+function openModal(html){
+  const bg = document.createElement('div');
+  bg.className = 'modal-bg';
+  bg.innerHTML = `<div class="modal">${html}</div>`;
+  bg.onclick = (e) => { if(e.target === bg) bg.remove(); };
+  document.body.appendChild(bg);
+  return bg;
+}
+
+function openRoleModal(){
+  const modal = openModal(`
+    <h3>Add New Role</h3>
+    <label>Role Title</label><input id="r-title" placeholder="Senior Frontend Engineer" />
+    <label>Department</label><input id="r-dept" placeholder="Engineering" />
+    <label>Location</label><input id="r-loc" placeholder="Bengaluru" />
+    <label>Hiring Manager</label><input id="r-hm" placeholder="Aditya Rao" />
+    <label>Open Positions</label><input id="r-pos" type="number" value="1" />
+    <label>Priority</label>
+    <select id="r-priority"><option>High</option><option selected>Medium</option><option>Low</option></select>
+    <div class="modal-actions">
+      <button class="btn-ghost" id="r-cancel">Cancel</button>
+      <button class="btn-small" id="r-save" style="flex:1;">Save Role</button>
+    </div>
+  `);
+  modal.querySelector('#r-cancel').onclick = () => modal.remove();
+  modal.querySelector('#r-save').onclick = async () => {
+    const title = modal.querySelector('#r-title').value.trim();
+    if(!title){ toast("Please enter a role title"); return; }
+    await sb.from('roles').insert({
+      org_id: state.orgId,
+      title,
+      department: modal.querySelector('#r-dept').value.trim(),
+      location: modal.querySelector('#r-loc').value.trim(),
+      hiring_manager: modal.querySelector('#r-hm').value.trim(),
+      open_positions: parseInt(modal.querySelector('#r-pos').value) || 1,
+      priority: modal.querySelector('#r-priority').value,
+      status: 'Open',
+      created_by: state.user.id
+    });
+    modal.remove();
+    await refreshData(); render();
+    toast("Role added!");
+  };
+}
+
+function openCandidateModal(){
+  const roleOptions = state.roles.map(r=>`<option value="${r.id}">${esc(r.title)}</option>`).join('');
+  const modal = openModal(`
+    <h3>Add Candidate</h3>
+    <label>Full Name</label><input id="c-name" placeholder="Arjun Mehta" />
+    <label>Role</label><select id="c-role">${roleOptions || '<option value="">No roles yet</option>'}</select>
+    <label>Designation</label><input id="c-desig" placeholder="SDE-2" />
+    <label>Experience (years)</label><input id="c-exp" type="number" step="0.5" />
+    <label>Email</label><input id="c-email" type="email" />
+    <label>Source</label>
+    <select id="c-source"><option>LinkedIn</option><option>Naukri</option><option>Referral</option><option>Campus Hiring</option><option>Consultant</option><option>Foundit</option><option>Instahyre</option><option>Apna</option><option>Indeed</option><option>Other</option></select>
+    <div class="modal-actions">
+      <button class="btn-ghost" id="c-cancel">Cancel</button>
+      <button class="btn-small" id="c-save" style="flex:1;">Save Candidate</button>
+    </div>
+  `);
+  modal.querySelector('#c-cancel').onclick = () => modal.remove();
+  modal.querySelector('#c-save').onclick = async () => {
+    const name = modal.querySelector('#c-name').value.trim();
+    if(!name){ toast("Please enter a candidate name"); return; }
+    await sb.from('candidates').insert({
+      org_id: state.orgId,
+      role_id: modal.querySelector('#c-role').value || null,
+      name,
+      designation: modal.querySelector('#c-desig').value.trim(),
+      experience_years: parseFloat(modal.querySelector('#c-exp').value) || null,
+      email: modal.querySelector('#c-email').value.trim(),
+      source: modal.querySelector('#c-source').value,
+      stage: 'Screening',
+      recruiter_id: state.user.id
+    });
+    modal.remove();
+    await refreshData(); render();
+    toast("Candidate added!");
+  };
+}
+</script>
+</body>
+</html>

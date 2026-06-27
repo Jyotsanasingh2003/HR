@@ -24,7 +24,7 @@
   /* ---------- AUTH SCREEN ---------- */
   #auth-screen{min-height:100vh; display:flex; align-items:center; justify-content:center; padding:20px;}
   .auth-box{
-    width:100%; max-width:400px; background:var(--card); border:1px solid var(--border);
+    width:100%; max-width:380px; background:var(--card); border:1px solid var(--border);
     border-radius:20px; padding:32px; backdrop-filter:blur(20px);
   }
   .logo{display:flex; align-items:center; gap:10px; margin-bottom:24px; justify-content:center;}
@@ -35,7 +35,7 @@
   }
   .logo-text{font-size:22px; font-weight:800;}
   .gradient-text{background:linear-gradient(90deg,var(--purple),var(--blue),var(--green)); -webkit-background-clip:text; background-clip:text; color:transparent;}
-  h2.title{text-align:center; font-size:16px; color:var(--muted); margin-bottom:24px; font-weight:500;}
+  h2.title{text-align:center; font-size:15px; color:var(--muted); margin-bottom:24px; font-weight:500;}
   label{font-size:13px; color:var(--muted); display:block; margin-bottom:6px; margin-top:14px;}
   input{
     width:100%; padding:11px 14px; border-radius:10px; border:1px solid var(--border);
@@ -52,10 +52,8 @@
   }
   .btn-primary:hover{box-shadow:0 8px 24px rgba(139,92,246,0.35); transform:translateY(-1px);}
   .btn-primary:disabled{opacity:0.6; cursor:not-allowed;}
-  .switch-mode{text-align:center; margin-top:16px; font-size:13px; color:var(--muted);}
-  .switch-mode a{color:var(--purple); cursor:pointer; font-weight:600; text-decoration:none;}
-  #auth-error{color:#f87171; font-size:13px; margin-top:10px; text-align:center;}
-  #auth-msg{color:#34d399; font-size:13px; margin-top:10px; text-align:center;}
+  #auth-error{color:#f87171; font-size:13px; margin-top:12px; text-align:center;}
+  #auth-msg{color:#34d399; font-size:13px; margin-top:12px; text-align:center;}
 
   /* ---------- APP SHELL ---------- */
   #app{display:none; min-height:100vh;}
@@ -140,27 +138,20 @@
 </head>
 <body>
 
-<!-- ================= AUTH SCREEN ================= -->
+<!-- ================= LOGIN SCREEN (single fixed user) ================= -->
 <div id="auth-screen">
   <div class="auth-box">
     <div class="logo"><div class="logo-icon">⚡</div><div class="logo-text">Recruit<span class="gradient-text">OS</span></div></div>
-    <h2 class="title" id="auth-title">Sign in to your workspace</h2>
+    <h2 class="title">Private workspace — sign in to continue</h2>
 
-    <div id="signup-fields" class="hidden">
-      <label>Full Name</label>
-      <input id="su-name" placeholder="Jane Doe" />
-      <label>Workspace / Company Name</label>
-      <input id="su-org" placeholder="Acme Talent Team" />
-    </div>
-    <label>Email</label>
-    <input id="auth-email" type="email" placeholder="you@company.com" />
+    <label>User ID</label>
+    <input id="login-id" placeholder="User ID" autocomplete="off" />
     <label>Password</label>
-    <input id="auth-password" type="password" placeholder="••••••••" />
+    <input id="login-password" type="password" placeholder="Password" />
 
-    <button class="btn-primary" id="auth-submit">Sign In</button>
+    <button class="btn-primary" id="login-submit">Log In</button>
     <div id="auth-error"></div>
     <div id="auth-msg"></div>
-    <div class="switch-mode" id="switch-line">Don't have an account? <a id="switch-link">Sign up</a></div>
   </div>
 </div>
 
@@ -191,6 +182,16 @@ const SUPABASE_URL = "https://tgbqnsqbfgxpqkvykxtl.supabase.co";
 const SUPABASE_KEY = "sb_publishable_2P3fUn2lOSAW5l50v8pryg_97jq3gj0";
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
+/* ===== Fixed single-user credentials =====
+   The on-screen User ID / Password is what YOU type and see.
+   Behind the scenes it signs in to one fixed Supabase account
+   (created automatically the first time you log in). */
+const FIXED_USER_ID = "Jsingh";
+const FIXED_PASSWORD = "Singhji@123";
+const FIXED_EMAIL = "thakurjyotsana995@gmail.com";   // the real account behind the scenes
+const FIXED_FULL_NAME = "Jyotsana Singh";
+const FIXED_ORG_NAME = "Zypp Electric";
+
 const STAGES = ["Screening","Round 1","Round 2","Round 3","Hiring Manager","Founder Round","HR Round"];
 
 let state = { user:null, profile:null, orgId:null, roles:[], candidates:[], view:"dashboard" };
@@ -201,54 +202,56 @@ function toast(msg){
   setTimeout(()=>{ t.style.display='none'; }, 2500);
 }
 
-/* ============== AUTH ============== */
-let isSignup = false;
-document.getElementById('switch-link').onclick = () => {
-  isSignup = !isSignup;
-  document.getElementById('signup-fields').classList.toggle('hidden', !isSignup);
-  document.getElementById('auth-title').textContent = isSignup ? "Create your workspace" : "Sign in to your workspace";
-  document.getElementById('auth-submit').textContent = isSignup ? "Sign Up" : "Sign In";
-  document.getElementById('switch-line').innerHTML = isSignup
-    ? 'Already have an account? <a id="switch-link2">Sign in</a>'
-    : 'Don\'t have an account? <a id="switch-link2">Sign up</a>';
-  document.getElementById('switch-link2').onclick = document.getElementById('switch-link').onclick;
-  document.getElementById('auth-error').textContent = '';
-  document.getElementById('auth-msg').textContent = '';
-};
-
-document.getElementById('auth-submit').onclick = async () => {
-  const email = document.getElementById('auth-email').value.trim();
-  const password = document.getElementById('auth-password').value;
+/* ============== LOGIN ============== */
+document.getElementById('login-submit').onclick = async () => {
+  const id = document.getElementById('login-id').value.trim();
+  const pw = document.getElementById('login-password').value;
   const errEl = document.getElementById('auth-error');
   const msgEl = document.getElementById('auth-msg');
-  errEl.textContent=''; msgEl.textContent='';
-  if(!email || !password){ errEl.textContent = "Please fill in email and password."; return; }
+  errEl.textContent = ''; msgEl.textContent = '';
 
-  const btn = document.getElementById('auth-submit');
-  btn.disabled = true; btn.textContent = "Please wait...";
+  if(id !== FIXED_USER_ID || pw !== FIXED_PASSWORD){
+    errEl.textContent = "Incorrect User ID or Password.";
+    return;
+  }
+
+  const btn = document.getElementById('login-submit');
+  btn.disabled = true; btn.textContent = "Logging in...";
 
   try{
-    if(isSignup){
-      const name = document.getElementById('su-name').value.trim();
-      const org = document.getElementById('su-org').value.trim();
-      const { data, error } = await sb.auth.signUp({
-        email, password,
-        options:{ data:{ full_name:name, org_name:org } }
+    // Try signing in to the real backend account first.
+    let { data, error } = await sb.auth.signInWithPassword({ email: FIXED_EMAIL, password: FIXED_PASSWORD });
+
+    if(error){
+      // If the account doesn't exist yet, create it automatically (first run only).
+      const signUpRes = await sb.auth.signUp({
+        email: FIXED_EMAIL,
+        password: FIXED_PASSWORD,
+        options: { data: { full_name: FIXED_FULL_NAME, org_name: FIXED_ORG_NAME } }
       });
-      if(error) throw error;
-      if(data.session){ await loadApp(); }
-      else { msgEl.textContent = "Account created! Check your email to confirm, then sign in."; }
-    } else {
-      const { data, error } = await sb.auth.signInWithPassword({ email, password });
-      if(error) throw error;
-      await loadApp();
+      if(signUpRes.error) throw signUpRes.error;
+
+      if(signUpRes.data.session){
+        data = signUpRes.data;
+      } else {
+        // Account created but needs email confirmation before it can sign in.
+        msgEl.textContent = "Account created. Please check " + FIXED_EMAIL + " for a confirmation link, then log in again.";
+        btn.disabled = false; btn.textContent = "Log In";
+        return;
+      }
     }
+
+    await loadApp();
   } catch(e){
-    errEl.textContent = e.message || "Something went wrong.";
+    errEl.textContent = e.message || "Something went wrong. Please try again.";
   } finally {
-    btn.disabled = false; btn.textContent = isSignup ? "Sign Up" : "Sign In";
+    btn.disabled = false; btn.textContent = "Log In";
   }
 };
+
+document.getElementById('login-password').addEventListener('keydown', e => {
+  if(e.key === 'Enter') document.getElementById('login-submit').click();
+});
 
 document.getElementById('logout-btn').onclick = async () => {
   await sb.auth.signOut();
@@ -265,7 +268,7 @@ async function loadApp(){
   state.profile = profile;
   state.orgId = profile?.org_id;
 
-  document.getElementById('who-name').textContent = profile?.full_name || user.email;
+  document.getElementById('who-name').textContent = FIXED_USER_ID;
 
   await refreshData();
 
@@ -281,7 +284,7 @@ async function refreshData(){
   state.candidates = candidates || [];
 }
 
-/* check existing session on page load */
+/* check existing session on page load — stays logged in until you log out */
 sb.auth.getSession().then(({ data }) => { if(data.session) loadApp(); });
 
 /* ============== NAVIGATION ============== */
